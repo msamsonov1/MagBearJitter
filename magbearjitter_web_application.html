@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagBearJitter: Reaction Wheel Magnetic Suspension Core Runout Sentinel</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            spaceDark: '#03050a',
+            panelDark: 'rgba(11, 17, 32, 0.75)',
+            borderDark: '#1e293b',
+            cyanGlow: '#06b6d4',
+            violetGlow: '#8b5cf6',
+            emeraldGlow: '#10b981',
+            roseAlert: '#ef4444',
+            amberWarn: '#f59e0b'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- MathJax v3 (Bulletproof Configuration) -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    body {
+      background-color: #03050a;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .formula-box {
+      background: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+      color: #67e8f9;
+      font-size: 0.875rem;
+      overflow-x: auto;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #070d19; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- Top Navigation / Telemetry Header -->
+  <header class="border-b border-gray-800 bg-[#070b14]/90 backdrop-blur sticky top-0 z-50 px-4 lg:px-8 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.25)]">
+          <i data-lucide="compass" class="w-6 h-6 animate-spin-slow"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono font-bold tracking-widest text-cyan-400 uppercase">NASA Deep-Space SBIR STTR</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-950/80 border border-violet-500/50 text-violet-300">TRL 4 &rarr; 6</span>
+          </div>
+          <h1 class="text-lg lg:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            MagBearJitter
+            <span class="text-xs font-normal text-gray-400 hidden sm:inline">| AMB Flywheel Core Runout Sentinel</span>
+          </h1>
+        </div>
+      </div>
+
+      <!-- Live Global Sentinel Badges -->
+      <div class="flex items-center gap-3 font-mono text-xs">
+        <div class="bg-gray-900/80 border border-gray-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
+          <span class="text-gray-400">JITTER:</span>
+          <span id="badgeJitter" class="font-bold text-emerald-400">0.082 &mu;g</span>
+        </div>
+        <div class="bg-gray-900/80 border border-gray-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
+          <span class="text-gray-400">FLUX RIPPLE:</span>
+          <span id="badgeFlux" class="font-bold text-cyan-400">0.014 mWb</span>
+        </div>
+        <div id="badgeStatus" class="px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 flex items-center gap-1.5 font-bold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          ACTIVE STABLE
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="max-w-7xl mx-auto mt-3 flex items-center gap-2 border-t border-gray-800/80 pt-2 overflow-x-auto text-sm">
+      <button id="tabBtnSim" onclick="switchTab('sim')" class="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 bg-cyan-950/60 border border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.15)]">
+        <i data-lucide="activity" class="w-4 h-4"></i>
+        1. Live Simulation &amp; Telemetry HUD
+      </button>
+      <button id="tabBtnPhysics" onclick="switchTab('physics')" class="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent">
+        <i data-lucide="atom" class="w-4 h-4"></i>
+        2. Core Physics &amp; Dynamic Inversion
+      </button>
+      <button id="tabBtnProposal" onclick="switchTab('proposal')" class="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent">
+        <i data-lucide="file-check-2" class="w-4 h-4"></i>
+        3. $225k NASA SBIR / Hardware Transition
+      </button>
+      <button id="tabBtnARR" onclick="switchTab('arr')" class="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent">
+        <i data-lucide="trending-up" class="w-4 h-4"></i>
+        4. Commercial ARR &amp; Civil Translation
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-6">
+
+    <!-- TAB 1: SIMULATION & TELEMETRY HUD -->
+    <section id="viewSim" class="space-y-6">
+      <!-- Control Bar & Anomaly Inversion Toggle -->
+      <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 lg:p-5 backdrop-blur flex flex-col lg:flex-row items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+          <!-- Adaptive Inverse Current Injection Toggle -->
+          <div class="flex items-center gap-3 bg-gray-950/80 border border-gray-800 px-4 py-2 rounded-xl">
+            <span class="text-xs font-mono font-bold text-gray-300">ADAPTIVE INVERSE CANCELLATION:</span>
+            <button id="btnToggleControl" onclick="toggleCancellation()" class="px-3 py-1 rounded-lg text-xs font-mono font-bold uppercase transition-all bg-cyan-500 text-black shadow-[0_0_12px_rgba(6,182,212,0.5)]">
+              ENABLED (ACTIVE)
+            </button>
+          </div>
+
+          <!-- Disturbance Injection -->
+          <button id="btnInjectDisturbance" onclick="triggerEccentricitySpike()" class="px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-rose-950/50 hover:bg-rose-900/70 border border-rose-500/40 text-rose-300 flex items-center gap-2 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-rose-400"></i>
+            INJECT MASS IMBALANCE FAULT ($e_{\mu} = 4.2\,\mu\text{m}$)
+          </button>
+        </div>
+
+        <!-- Sliders: Flywheel RPM & Thermal Drift -->
+        <div class="flex flex-wrap items-center gap-5 w-full lg:w-auto justify-end">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-mono text-gray-400">WHEEL SPEED:</label>
+            <input id="sliderSpeed" type="range" min="2000" max="12000" value="6500" step="100" class="w-28 accent-cyan-400" oninput="updateSpeed(this.value)">
+            <span id="lblSpeed" class="text-xs font-mono text-cyan-300 w-16">6500 RPM</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-mono text-gray-400">BASE ECCENTRICITY:</label>
+            <input id="sliderEccentricity" type="range" min="0.1" max="5.0" value="0.4" step="0.1" class="w-24 accent-violet-400" oninput="updateEccentricity(this.value)">
+            <span id="lblEccentricity" class="text-xs font-mono text-violet-300 w-14">0.4 &mu;m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary Grid: Cross-Section Canvas & Phase-Space Plot -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- AMB Cross Section Canvas -->
+        <div class="lg:col-span-6 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div class="flex items-center justify-between border-b border-gray-800/80 pb-3 mb-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="disc" class="w-4 h-4 text-cyan-400"></i>
+              <h2 class="text-sm font-bold tracking-wide uppercase text-white font-mono">AMB Rotor &amp; 4-Quadrant Flux Linkage</h2>
+            </div>
+            <span id="canvasTelemetryText" class="text-xs font-mono text-cyan-400">Shaft Orbit: &plusmn;0.06 &mu;m</span>
+          </div>
+
+          <div class="relative w-full h-[320px] bg-[#020409] rounded-xl border border-gray-950 overflow-hidden flex items-center justify-center">
+            <canvas id="ambCanvas" class="w-full h-full block"></canvas>
+            <!-- Canvas HUD Overlays -->
+            <div class="absolute top-3 left-3 text-[10px] font-mono text-gray-400 pointer-events-none space-y-1 bg-black/60 p-2 rounded border border-gray-800/60">
+              <div>Pole Pairs: 8-Pole Heteropolar</div>
+              <div>Nominal Airgap $g_0$: 500 &mu;m</div>
+              <div>Harmonic Runout: 1X &amp; 2X Decoupled</div>
+            </div>
+            <div class="absolute bottom-3 right-3 text-[10px] font-mono text-right text-gray-400 pointer-events-none space-y-1 bg-black/60 p-2 rounded border border-gray-800/60">
+              <div id="shaftDisplacementX">$\delta_x$: +0.012 &mu;m</div>
+              <div id="shaftDisplacementY">$\delta_y$: -0.009 &mu;m</div>
+              <div id="fluxPerturbHUD">$\Delta \Phi$: 0.014 mWb</div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+            <div class="p-2 rounded-lg bg-gray-950/70 border border-gray-800">
+              <div class="text-gray-400 text-[10px]">Coil Current $I_0 \pm \Delta I$</div>
+              <div id="statCurrent" class="text-cyan-300 font-bold mt-0.5">2.41 A</div>
+            </div>
+            <div class="p-2 rounded-lg bg-gray-950/70 border border-gray-800">
+              <div class="text-gray-400 text-[10px]">Harmonic Force $F_{\text{runout}}$</div>
+              <div id="statForce" class="text-violet-300 font-bold mt-0.5">0.038 N</div>
+            </div>
+            <div class="p-2 rounded-lg bg-gray-950/70 border border-gray-800">
+              <div class="text-gray-400 text-[10px]">Lunar Payload Jitter</div>
+              <div id="statJitter" class="text-emerald-300 font-bold mt-0.5">&lt; 0.1 &mu;g RMS</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Primary Diagnostic Phase-Space Chart: Flux (Phi) vs Accel (a) -->
+        <div class="lg:col-span-6 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div class="flex items-center justify-between border-b border-gray-800/80 pb-3 mb-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="line-chart" class="w-4 h-4 text-violet-400"></i>
+              <h2 class="text-sm font-bold tracking-wide uppercase text-white font-mono">Phase-Space Trajectory: Flux ($\Phi$) vs Accel ($a$)</h2>
+            </div>
+            <span class="text-xs font-mono text-violet-400 bg-violet-950/40 border border-violet-800/60 px-2 py-0.5 rounded">
+              Sentinel State Space
+            </span>
+          </div>
+
+          <div class="relative w-full h-[320px] bg-[#020409] rounded-xl border border-gray-950 p-2">
+            <canvas id="phaseSpaceChart"></canvas>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between text-xs text-gray-400 px-1">
+            <span class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block shadow-[0_0_8px_#06b6d4]"></span> Live $(\Phi, a)$ State
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-3 h-1 bg-emerald-400 inline-block"></span> Nominal Baseline Corridor
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-3 h-1 bg-rose-500 border-dashed inline-block"></span> Micro-g Jitter Hazard Threshold
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Secondary Telemetry Plots: Time-Series Vibration & Flux Linkage -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-6 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-mono font-bold text-gray-300 flex items-center gap-2">
+              <i data-lucide="waves" class="w-4 h-4 text-cyan-400"></i>
+              Chassis Micro-Vibration Acceleration $a(t)$ [Micro-g]
+            </span>
+            <span id="lblLiveAccel" class="text-xs font-mono text-cyan-300">0.082 &mu;g</span>
+          </div>
+          <div class="h-44 bg-[#020409] rounded-xl border border-gray-950 p-2">
+            <canvas id="timeSeriesAccelChart"></canvas>
+          </div>
+        </div>
+
+        <div class="lg:col-span-6 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-mono font-bold text-gray-300 flex items-center gap-2">
+              <i data-lucide="radio" class="w-4 h-4 text-violet-400"></i>
+              Active Bearing Flux Ripple Linkage $\Phi(t)$ [mWb]
+            </span>
+            <span id="lblLiveFlux" class="text-xs font-mono text-violet-300">0.014 mWb</span>
+          </div>
+          <div class="h-44 bg-[#020409] rounded-xl border border-gray-950 p-2">
+            <canvas id="timeSeriesFluxChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: CORE PHYSICS & MATHEMATICAL MODEL -->
+    <section id="viewPhysics" class="hidden space-y-6">
+      <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 backdrop-blur">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="p-2 rounded-lg bg-cyan-950/80 border border-cyan-500/40 text-cyan-400">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+          </div>
+          <h2 class="text-lg font-bold text-white">Mathematical Physics &amp; State Space Synthesis</h2>
+        </div>
+        <p class="text-sm text-gray-300 leading-relaxed">
+          The MagBearJitter sentinel addresses the fundamental trade-off in Active Magnetic Bearing (AMB) momentum flywheels deployed on astronomical spacecraft and lunar observatories. Mechanical mass eccentricity causes rotational synchronous forces, while geometric core runout introduces parasitic sensor errors. By dynamically mapping the acceleration-flux vector space $(\Phi, a)$, the software discriminates true rotor mass unbalance from sensor runout, injecting exact anti-phase cancellation currents to nullify chassis torque transmission.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Card 1: Electromagnetic Flux & Radial Magnetic Force -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-cyan-400 mb-2">
+              <i data-lucide="layers" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold font-mono uppercase tracking-wider text-white">1. AMB Maxwell Stress &amp; Flux Linkage</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              For an 8-pole heteropolar active magnetic bearing, the total magnetic attractive force exerted on the ferromagnetic shaft in the radial degree of freedom $x$ is governed by Maxwell's stress tensor across dynamic air gaps:
+            </p>
+            <div class="formula-box">
+              $$F_{\text{mag}}(x, i) = \frac{\mu_0 N^2 A}{4} \left[ \left(\frac{I_0 + i_x}{g_0 - x}\right)^2 - \left(\frac{I_0 - i_x}{g_0 + x}\right)^2 \right]$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              Where $\mu_0$ is vacuum permeability ($4\pi \times 10^{-7}\,\text{H/m}$), $N$ is coil turn count, $A$ is pole projected area, $I_0$ is bias current, $i_x$ is dynamic control perturbation, and $g_0$ is nominal stator-rotor gap ($500\,\mu\text{m}$). Coil magnetic flux linkage $\Phi_x$ couples directly to current and instant displacement:
+            </p>
+            <div class="formula-box">
+              $$\Phi_x(t) = \frac{\mu_0 N A}{2} \left( \frac{I_0 + i_x(t)}{g_0 - x(t)} \right) \approx \Phi_0 + k_i i_x(t) + k_x x(t)$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-cyan-300/80 bg-cyan-950/30 p-2.5 rounded-lg border border-cyan-800/40 mt-3">
+            Flux displacement sensitivity: $k_x = \frac{\Phi_0}{g_0} \approx 4.8 \times 10^3\,\text{Wb/m}$.
+          </div>
+        </div>
+
+        <!-- Card 2: Rotor Imbalance Dynamic Acceleration -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-violet-400 mb-2">
+              <i data-lucide="orbit" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold font-mono uppercase tracking-wider text-white">2. Centrifugal Mass Eccentricity &amp; Micro-g Jitter</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              A rotating flywheel rotor of mass $m_r$ spinning at angular frequency $\Omega = 2\pi f_r$ with a center-of-mass eccentricity offset $e$ produces synchronous centrifugal force $F_c$ and angular runout torque:
+            </p>
+            <div class="formula-box">
+              $$F_c(t) = m_r \Omega^2 e \cos(\Omega t + \beta) \implies a_{\text{chassis}}(t) = \frac{m_r \Omega^2 e}{M_{\text{obs}}} \sin(\Omega t)$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              When transmitted into the lunar astronomical telescope chassis (mass $M_{\text{obs}}$), this dynamic unbalance produces structural acceleration $a(t)$ reaching $10^{-4}\,g$ without active damping, blowing past the strict micro-vibration pointing budget ($a_{\text{allow}} \le 0.1\,\mu g$ for diffraction-limited imaging).
+            </p>
+            <div class="formula-box">
+              $$Jitter_{\text{RMS}} = \sqrt{\frac{1}{T}\int_0^T [a_x(t)^2 + a_y(t)^2] dt} \propto \frac{e \cdot \Omega^2}{M_{\text{obs}}}$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-violet-300/80 bg-violet-950/30 p-2.5 rounded-lg border border-violet-800/40 mt-3">
+            At $12,000\,\text{RPM}$ ($\Omega = 1256\,\text{rad/s}$), an eccentricity $e = 1\,\mu\text{m}$ imparts over $7.8\,\text{N}$ of uncompensated synchronous shear.
+          </div>
+        </div>
+
+        <!-- Card 3: Adaptive Harmonic Inverse Notch Filter -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-emerald-400 mb-2">
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold font-mono uppercase tracking-wider text-white">3. Adaptive Inverse Current Injection Sentinel</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              The attitude control processor extracts the synchronous Fourier coefficients of dynamic flux ripple $\Phi(t)$ and radial acceleration $a(t)$ across the instantaneous rotor frame angle $\theta(t) = \int \Omega dt$:
+            </p>
+            <div class="formula-box">
+              $$\begin{bmatrix} C_k \\ S_k \end{bmatrix} = \frac{2}{T_r} \int_{0}^{T_r} \begin{bmatrix} \cos(k \Omega t) \\ \sin(k \Omega t) \end{bmatrix} \Phi(t)\, dt$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              The observer calculates the optimal counter-harmonic control injection $i_{\text{inj}}(t)$ via an adaptive LMS/Luenberger state-space estimator, allowing the rotor to spin freely around its inertial principal mass axis rather than the geometric stator center:
+            </p>
+            <div class="formula-box">
+              $$i_{\text{inj}}(t) = - \sum_{k=1}^3 \hat{W}_k(t) \cdot \left[ C_k \cos(k \Omega t) + S_k \sin(k \Omega t) \right]$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-emerald-300/80 bg-emerald-950/30 p-2.5 rounded-lg border border-emerald-800/40 mt-3">
+            Automatic Zero-Current Control (ZCC) eliminates reaction forces transmitted through magnetic flux gradients.
+          </div>
+        </div>
+
+        <!-- Card 4: Sensor Runout & Geometric Artifact Separation -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-amber-400 mb-2">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold font-mono uppercase tracking-wider text-white">4. Physical Runout vs Mass Imbalance Inversion</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              A critical physical trap in magnetic bearings is sensor target runout (machining out-of-roundness $\delta_r(\theta)$ and electrical runout $\Delta\mu_r$). Legacy controllers mistake sensor runout for actual shaft motion, erroneously commanding coil currents that generate physical jitter.
+            </p>
+            <div class="formula-box">
+              $$x_{\text{sensor}}(t) = x_{\text{mech}}(t) + \delta_r(\theta) + \eta_{\text{thermal}}(t)$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              MagBearJitter separates electrical sensor runout from true mechanical acceleration by observing the quadrature phase correlation between coil terminal flux linkage $\Phi(t)$ and chassis piezoelectric micro-g sensor signals $a(t)$:
+            </p>
+            <div class="formula-box">
+              $$\mathcal{D}_{\text{runout}} = \oint \Phi(t)\, da(t) = \int_0^{T_r} \Phi(t) \frac{da}{dt} dt \implies \begin{cases} > \Gamma_{\text{th}}, & \text{Mass Imbalance} \\ \approx 0, & \text{Machined Runout} \end{cases}$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-amber-300/80 bg-amber-950/30 p-2.5 rounded-lg border border-amber-800/40 mt-3">
+            Real-time trajectory integral $\mathcal{D}_{\text{runout}}$ prevents false bearing actuator excitation.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: $225K NASA SBIR / HARDWARE TRANSITION -->
+    <section id="viewProposal" class="hidden space-y-6">
+      <!-- Proposal Banner -->
+      <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 backdrop-blur">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-md bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-bold">
+                NASA TOPIC Z10.02-2026
+              </span>
+              <span class="text-xs font-mono text-gray-400">Deep Space Observatories &amp; Precision Pointing</span>
+            </div>
+            <h2 class="text-xl font-bold text-white mt-2">
+              Active Magnetic Bearing Core Runout Sentinel (MagBearJitter)
+            </h2>
+            <p class="text-xs text-gray-400 mt-1 font-mono">
+              STTR Phase I Solicitation | Total Budget: $225,000 | Period of Performance: 6 Months
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="text-right">
+              <div class="text-[11px] font-mono text-gray-400">UNIVERSITY STTR SUBCONTRACT (30.0%)</div>
+              <div class="text-lg font-mono font-bold text-cyan-400">$67,500.00</div>
+            </div>
+            <div class="p-3 bg-cyan-950/60 border border-cyan-500/30 rounded-xl text-cyan-300">
+              <i data-lucide="landmark" class="w-6 h-6"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- STTR Partnership Details -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+          <div class="bg-gray-950/70 border border-gray-800 p-3.5 rounded-xl">
+            <span class="text-gray-400 block mb-1">LEAD CONTRACTOR:</span>
+            <span class="text-white font-bold">RFWaveCode Aerospace LLC</span>
+            <span class="text-gray-500 block text-[10px] mt-1">SBC Small Business Concern | CAGE: 9Y8B1</span>
+          </div>
+          <div class="bg-gray-950/70 border border-gray-800 p-3.5 rounded-xl">
+            <span class="text-gray-400 block mb-1">RESEARCH INSTITUTION (RI):</span>
+            <span class="text-cyan-300 font-bold">University of Central Florida (UCF)</span>
+            <span class="text-gray-500 block text-[10px] mt-1">CATER Labs / Dept of Mechanical &amp; Aerospace Eng</span>
+          </div>
+          <div class="bg-gray-950/70 border border-gray-800 p-3.5 rounded-xl">
+            <span class="text-gray-400 block mb-1">MISSION TARGET:</span>
+            <span class="text-violet-300 font-bold">Lunar Far-Side Optical Array (LFOA)</span>
+            <span class="text-gray-500 block text-[10px] mt-1">Sub-nanoradian Line-of-Sight Stability</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Work Breakdown: Months 1 to 6 -->
+      <div class="space-y-4">
+        <h3 class="text-sm font-bold uppercase tracking-wider text-gray-300 font-mono flex items-center gap-2">
+          <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+          Phase I Work Breakdown Schedule &amp; Deliverables
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Month 1-2 -->
+          <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+                <span class="font-bold">MILESTONE 1</span>
+                <span>M1 &ndash; M2</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-2">Heteropolar AMB Nonlinear Field Modeling</h4>
+              <p class="text-xs text-gray-300 leading-relaxed">
+                Develop 2D/3D FEA electromagnetic models of the 8-pole heteropolar magnetic bearing with stator-rotor saturation curves. Calibrate airgap flux perturbation $\Phi(x, y)$ vs. mass imbalance eccentricity $e$.
+              </p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-400">
+              Deliverable: High-fidelity FEA verification report &amp; flux-current boundary tables.
+            </div>
+          </div>
+
+          <!-- Month 3 -->
+          <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+                <span class="font-bold">MILESTONE 2</span>
+                <span>M3</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-2">State Observer &amp; Runout Discriminator</h4>
+              <p class="text-xs text-gray-300 leading-relaxed">
+                Formulate the dynamic $(\Phi, a)$ trajectory discriminator. Differentiate pure geometric rotor core runout (sensor out-of-roundness) from physical centrifugal mass imbalances in real-time embedded DSP code.
+              </p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-400">
+              Deliverable: C/C++ embedded flight-ready algorithm &amp; software simulation suite.
+            </div>
+          </div>
+
+          <!-- Month 4-5 -->
+          <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+                <span class="font-bold">MILESTONE 3</span>
+                <span>M4 &ndash; M5</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-2">Adaptive Inverse Injection Controller</h4>
+              <p class="text-xs text-gray-300 leading-relaxed">
+                Implement closed-loop adaptive anti-harmonic current synthesizer in FPGA testbench. Demonstrate 28 dB attenuation of 1X and 2X synchronous micro-g acceleration harmonics across 2,000&ndash;12,000 RPM wheel speeds.
+              </p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-400">
+              Deliverable: Hardware-in-the-loop (HIL) FPGA firmware package &amp; bench test report.
+            </div>
+          </div>
+
+          <!-- Month 6 -->
+          <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+                <span class="font-bold">MILESTONE 4</span>
+                <span>M6</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-2">Hardware Transition &amp; Phase II Readiness</h4>
+              <p class="text-xs text-gray-300 leading-relaxed">
+                Complete integrated testbench runs inside the UCF vacuum chamber facility simulating cryogenic lunar thermal conditions. Finalize CDR and architecture specification for $1.15M Phase II prototype.
+              </p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-400">
+              Deliverable: Final STTR Technical Report &amp; Phase II Commercialization Strategy.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase II Transition Plan Card -->
+      <div class="bg-gradient-to-r from-cyan-950/40 via-violet-950/30 to-gray-950/60 border border-cyan-800/40 rounded-2xl p-6 backdrop-blur">
+        <div class="flex items-center gap-3 mb-3">
+          <i data-lucide="rocket" class="w-5 h-5 text-cyan-400"></i>
+          <h3 class="text-base font-bold text-white">Phase II Transition: Flight Prototype &amp; Space Qualification ($1,150,000)</h3>
+        </div>
+        <p class="text-xs text-gray-300 leading-relaxed mb-4">
+          Phase II will manufacture a space-rated 50 Nms Active Magnetic Bearing Flywheel integrated with radiation-hardened gallium nitride (GaN) switching bridges and micro-g quartz accelerometer arrays. Testing will execute within the University of Central Florida CATER high-vacuum chambers, subjecting the levitated flywheel to thermal-vacuum cyclings ($-150^\circ\text{C}$ to $+80^\circ\text{C}$) to guarantee zero optical payload degradation for Artemis IV lunar telescopes.
+        </p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+          <div class="bg-black/50 p-3 rounded-lg border border-gray-800 text-center">
+            <span class="text-gray-400 block text-[10px]">MOMENTUM CAPACITY</span>
+            <span class="text-cyan-300 font-bold">50 N&middot;m&middot;s</span>
+          </div>
+          <div class="bg-black/50 p-3 rounded-lg border border-gray-800 text-center">
+            <span class="text-gray-400 block text-[10px]">CHASSIS JITTER GOAL</span>
+            <span class="text-emerald-300 font-bold">&le; 0.05 &mu;g RMS</span>
+          </div>
+          <div class="bg-black/50 p-3 rounded-lg border border-gray-800 text-center">
+            <span class="text-gray-400 block text-[10px]">PHASE II DURATION</span>
+            <span class="text-violet-300 font-bold">24 Months</span>
+          </div>
+          <div class="bg-black/50 p-3 rounded-lg border border-gray-800 text-center">
+            <span class="text-gray-400 block text-[10px]">TARGET TRL AT CLOSE</span>
+            <span class="text-amber-300 font-bold">TRL 6 / 7</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: COMMERCIAL & NATIONWIDE ARR BREAKDOWN -->
+    <section id="viewARR" class="hidden space-y-6">
+      <!-- Executive Summary Card -->
+      <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 backdrop-blur">
+        <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-gray-800 pb-5 mb-5">
+          <div>
+            <span class="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Civil &amp; Commercial Deep-Tech Translation</span>
+            <h2 class="text-xl font-bold text-white mt-1">Enterprise Market Sizing: $218.4M Nationwide ARR</h2>
+            <p class="text-xs text-gray-300 mt-2 max-w-3xl leading-relaxed">
+              <strong>Executive Summary:</strong> MagBearJitter transforms magnetic suspension diagnostics from an aerospace niche into an essential real-time vibration mitigation operating system across high-value industrial rotary assets, eliminating mechanical micro-jitter and bearing degradation without hardware changes.
+            </p>
+          </div>
+          <div class="bg-cyan-950/60 border border-cyan-500/40 p-4 rounded-xl text-right font-mono min-w-[220px]">
+            <div class="text-[10px] text-gray-400 uppercase">Enterprise Valuation (10x ARR)</div>
+            <div class="text-2xl font-bold text-cyan-300 mt-1">$2.18 Billion</div>
+            <div class="text-[10px] text-emerald-400 mt-1 font-semibold">&uarr; SaaS High-Margin Tier</div>
+          </div>
+        </div>
+
+        <!-- ARR Distribution Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono border-collapse">
+            <thead>
+              <tr class="border-b border-gray-800 text-gray-400 bg-gray-950/60">
+                <th class="p-3">Commercial Vertical</th>
+                <th class="p-3">Target Application</th>
+                <th class="p-3">Software Runtime Pricing</th>
+                <th class="p-3">Nationwide Asset Base</th>
+                <th class="p-3 text-right">Mature ARR</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/60 text-gray-200">
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3 font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-cyan-400"></span> Commercial Earth Observation Satellites
+                </td>
+                <td class="p-3 text-gray-400">Sub-0.3m optical/SAR constellation reaction wheels</td>
+                <td class="p-3 text-cyan-300">$18,500 / satellite / yr</td>
+                <td class="p-3">3,200 commercial satellites</td>
+                <td class="p-3 text-right font-bold text-white">$59.2M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3 font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-violet-400"></span> Semiconductor EUV Lithography
+                </td>
+                <td class="p-3 text-gray-400">Turbomolecular high-vacuum magnetic levitation pumps</td>
+                <td class="p-3 text-cyan-300">$8,200 / pump / yr</td>
+                <td class="p-3">6,400 fab vacuum modules</td>
+                <td class="p-3 text-right font-bold text-white">$52.48M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3 font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Grid Flywheel Energy Storage Systems
+                </td>
+                <td class="p-3 text-gray-400">Utility-scale 20 kWh FESS active rotor balance damping</td>
+                <td class="p-3 text-cyan-300">$3,400 / flywheel / yr</td>
+                <td class="p-3">12,500 grid buffer flywheels</td>
+                <td class="p-3 text-right font-bold text-white">$42.5M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3 font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-amber-400"></span> LNG Cryogenic Turboexpanders
+                </td>
+                <td class="p-3 text-gray-400">Magnetic bearing natural gas liquification expanders</td>
+                <td class="p-3 text-cyan-300">$24,000 / compressor / yr</td>
+                <td class="p-3">1,450 critical gas trains</td>
+                <td class="p-3 text-right font-bold text-white">$34.8M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3 font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-rose-400"></span> High-Speed Centrifugal Medical Imaging
+                </td>
+                <td class="p-3 text-gray-400">Ultra-fast 320-slice CT scanner gantry magnetic bearing</td>
+                <td class="p-3 text-cyan-300">$5,800 / scanner / yr</td>
+                <td class="p-3">5,100 clinical hospital scanners</td>
+                <td class="p-3 text-right font-bold text-white">$29.58M</td>
+              </tr>
+              <tr class="bg-cyan-950/20 font-bold text-cyan-300 border-t-2 border-cyan-800">
+                <td class="p-3" colspan="4">TOTAL NATIONWIDE TARGET CIVIL ARR</td>
+                <td class="p-3 text-right text-base text-cyan-400">$218.56M</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detailed Vertical Breakdown Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Vertical 1 -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-cyan-400 mb-2">
+              <i data-lucide="satellite" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold text-white">Commercial Earth Observation</h3>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-gray-400 block font-mono font-bold">PHYSICS IN 1 SENTENCE:</span>
+              <p class="text-xs text-gray-300 italic mt-0.5">
+                Dynamic inverse flux harmonic control cancels unbalance torques at the source, preventing pixel smear during 0.15m ground-sample-distance optical exposures.
+              </p>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-cyan-400 block font-mono font-bold">WHY OTHERS MISSED THIS:</span>
+              <p class="text-xs text-gray-300 mt-0.5">
+                Legacy satellite builders relied on passive elastomeric isolator rings which harden and degrade in orbital vacuum, amplifying micro-vibrations over mission life.
+              </p>
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-cyan-300 text-right mt-2 font-bold">
+            Target ARR: $59.2M
+          </div>
+        </div>
+
+        <!-- Vertical 2 -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-violet-400 mb-2">
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold text-white">Semiconductor EUV Lithography</h3>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-gray-400 block font-mono font-bold">PHYSICS IN 1 SENTENCE:</span>
+              <p class="text-xs text-gray-300 italic mt-0.5">
+                Levitated turbopumps operating at 60,000 RPM eliminate sub-micron stage vibration that causes critical dimension overlay errors on 2nm silicon wafers.
+              </p>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-violet-400 block font-mono font-bold">WHY OTHERS MISSED THIS:</span>
+              <p class="text-xs text-gray-300 mt-0.5">
+                Fabs blamed floor acoustics and spent millions on concrete floating plinths rather than isolating high-frequency magnetic bearing ripple inside the vacuum pumps.
+              </p>
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-violet-300 text-right mt-2 font-bold">
+            Target ARR: $52.5M
+          </div>
+        </div>
+
+        <!-- Vertical 3 -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-emerald-400 mb-2">
+              <i data-lucide="battery-charging" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold text-white">Grid Flywheel Energy Storage</h3>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-gray-400 block font-mono font-bold">PHYSICS IN 1 SENTENCE:</span>
+              <p class="text-xs text-gray-300 italic mt-0.5">
+                Adaptive magnetic axis recentering dampens rotor precessional wobble without contact wear, extending utility flywheel operating lifespans past 25 years.
+              </p>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-emerald-400 block font-mono font-bold">WHY OTHERS MISSED THIS:</span>
+              <p class="text-xs text-gray-300 mt-0.5">
+                Grid operators treated balance drift as mechanical fatigue requiring costly scheduled rotor replacements rather than dynamic magnetic axis compensation.
+              </p>
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-emerald-300 text-right mt-2 font-bold">
+            Target ARR: $42.5M
+          </div>
+        </div>
+
+        <!-- Vertical 4 -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-amber-400 mb-2">
+              <i data-lucide="flame" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold text-white">LNG Cryogenic Turboexpanders</h3>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-gray-400 block font-mono font-bold">PHYSICS IN 1 SENTENCE:</span>
+              <p class="text-xs text-gray-300 italic mt-0.5">
+                Magnetic runout sensing tracks liquid methane droplet condensation imbalance on impellers, preventing catastrophic touch-down bearing crashes.
+              </p>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-amber-400 block font-mono font-bold">WHY OTHERS MISSED THIS:</span>
+              <p class="text-xs text-gray-300 mt-0.5">
+                Plants used conventional proximity probe threshold alarms that shut down entire liquefaction trains rather than automatically nullifying the unbalance force.
+              </p>
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-amber-300 text-right mt-2 font-bold">
+            Target ARR: $34.8M
+          </div>
+        </div>
+
+        <!-- Vertical 5 -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-rose-400 mb-2">
+              <i data-lucide="scan" class="w-4 h-4"></i>
+              <h3 class="text-sm font-bold text-white">High-Speed Medical CT Imaging</h3>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-gray-400 block font-mono font-bold">PHYSICS IN 1 SENTENCE:</span>
+              <p class="text-xs text-gray-300 italic mt-0.5">
+                Zero-current anti-jitter filtering on 250 RPM full-body rotating gantries eliminates motion artifacts in sub-millimeter coronary angiography scans.
+              </p>
+            </div>
+            <div class="p-2.5 rounded-lg bg-gray-950/80 border border-gray-800 my-2">
+              <span class="text-[10px] text-rose-400 block font-mono font-bold">WHY OTHERS MISSED THIS:</span>
+              <p class="text-xs text-gray-300 mt-0.5">
+                Medical OEMs relied on heavy mechanical balance weights tuned at installation, failing to compensate for thermal expansion and patient bed loading variances.
+              </p>
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-rose-300 text-right mt-2 font-bold">
+            Target ARR: $29.6M
+          </div>
+        </div>
+
+        <!-- Direct Contact Card -->
+        <div class="bg-gradient-to-br from-cyan-950/70 to-gray-950 border border-cyan-500/40 rounded-2xl p-5 backdrop-blur flex flex-col justify-between text-center">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center mx-auto mb-3">
+              <i data-lucide="mail" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">Commercial Licensing &amp; OEM SDK</h3>
+            <p class="text-xs text-gray-300 mt-2 leading-relaxed">
+              Available as a portable MISRA-C/C++ firmware library and FPGA IP core for aerospace, semiconductor, and industrial rotating machinery systems.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-cyan-800/40">
+            <a href="mailto:support@rfwavecode.com" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono font-bold text-xs transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+              support@rfwavecode.com
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Persistent Footer -->
+  <footer class="border-t border-gray-800 bg-[#040711] py-4 px-6 text-center text-xs font-mono text-gray-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>MagBearJitter &copy; 2026 RFWaveCode Aerospace LLC. In Partnership with UCF CATER Labs.</div>
+      <div class="flex items-center gap-4 text-gray-400">
+        <span>NASA STTR Topic Z10.02</span>
+        <span>&bull;</span>
+        <span>TRL 4 &rarr; 6</span>
+        <span>&bull;</span>
+        <a href="mailto:support@rfwavecode.com" class="text-cyan-400 hover:underline">support@rfwavecode.com</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SCRIPT ARCHITECTURE: SIMULATION, CHARTS, LOGIC -->
+  <script>
+    // Tab Switching Architecture with DOM Integrity & MathJax re-render
+    const tabMapping = {
+      'sim': { viewId: 'viewSim', btnId: 'tabBtnSim' },
+      'physics': { viewId: 'viewPhysics', btnId: 'tabBtnPhysics' },
+      'proposal': { viewId: 'viewProposal', btnId: 'tabBtnProposal' },
+      'arr': { viewId: 'viewARR', btnId: 'tabBtnARR' }
+    };
+
+    function switchTab(activeKey) {
+      Object.keys(tabMapping).forEach(key => {
+        const view = document.getElementById(tabMapping[key].viewId);
+        const btn = document.getElementById(tabMapping[key].btnId);
+        if (key === activeKey) {
+          view.classList.remove('hidden');
+          btn.className = "px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 bg-cyan-950/60 border border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.15)]";
+        } else {
+          view.classList.add('hidden');
+          btn.className = "px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent";
+        }
+      });
+
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise();
+      }
+
+      if (activeKey === 'sim') {
+        resizeCanvas();
+      }
+    }
+
+    // Physical System State Variables
+    let wheelRPM = 6500;
+    let baseEccentricityMicrons = 0.4;
+    let faultSpikeActive = false;
+    let faultTimer = 0;
+    let cancellationEnabled = true;
+
+    // Realtime Dynamic Variables
+    let shaftTheta = 0;
+    let liveShaftX = 0;
+    let liveShaftY = 0;
+    let liveFluxRipple_mWb = 0.014;
+    let liveChassisAccel_ug = 0.082;
+    let dynamicCurrent = 2.41;
+    let dynamicForce = 0.038;
+
+    // Telemetry Buffer Queues (for charts)
+    const MAX_POINTS = 32;
+    let timeSeriesLabels = [];
+    let accelDataBuffer = [];
+    let fluxDataBuffer = [];
+    let phaseTrajectoryBuffer = [];
+
+    // Initialize telemetry buffers
+    for (let i = 0; i < MAX_POINTS; i++) {
+      timeSeriesLabels.push(i.toString());
+      accelDataBuffer.push(0.08);
+      fluxDataBuffer.push(0.014);
+    }
+
+    // Canvas Context & Hi-DPI Setup
+    const canvas = document.getElementById('ambCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = rect.width || 500;
+      const h = rect.height || 320;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      if (phaseChart) phaseChart.resize();
+      if (accelChart) accelChart.resize();
+      if (fluxChart) fluxChart.resize();
+    });
+
+    // Control Toggles & Sliders
+    function toggleCancellation() {
+      cancellationEnabled = !cancellationEnabled;
+      const btn = document.getElementById('btnToggleControl');
+      if (cancellationEnabled) {
+        btn.textContent = 'ENABLED (ACTIVE)';
+        btn.className = 'px-3 py-1 rounded-lg text-xs font-mono font-bold uppercase transition-all bg-cyan-500 text-black shadow-[0_0_12px_rgba(6,182,212,0.5)]';
+      } else {
+        btn.textContent = 'DISABLED (OFF)';
+        btn.className = 'px-3 py-1 rounded-lg text-xs font-mono font-bold uppercase transition-all bg-rose-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.5)]';
+      }
+      updateGlobalStatusBadges();
+    }
+
+    function triggerEccentricitySpike() {
+      faultSpikeActive = true;
+      faultTimer = 140; // lasts for ~140 ticks
+    }
+
+    function updateSpeed(val) {
+      wheelRPM = parseFloat(val);
+      document.getElementById('lblSpeed').textContent = `${wheelRPM} RPM`;
+    }
+
+    function updateEccentricity(val) {
+      baseEccentricityMicrons = parseFloat(val);
+      document.getElementById('lblEccentricity').textContent = `${baseEccentricityMicrons.toFixed(1)} \u03BCm`;
+    }
+
+    function updateGlobalStatusBadges() {
+      const badgeStatus = document.getElementById('badgeStatus');
+      const badgeJitter = document.getElementById('badgeJitter');
+      const badgeFlux = document.getElementById('badgeFlux');
+
+      badgeJitter.textContent = `${liveChassisAccel_ug.toFixed(3)} \u03BCg`;
+      badgeFlux.textContent = `${liveFluxRipple_mWb.toFixed(3)} mWb`;
+
+      if (liveChassisAccel_ug > 0.15) {
+        badgeStatus.className = "px-3 py-1.5 rounded-lg border border-rose-500/50 bg-rose-950/60 text-rose-300 flex items-center gap-1.5 font-bold animate-pulse";
+        badgeStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> JITTER HAZARD EXCEEDED`;
+      } else if (liveChassisAccel_ug > 0.09) {
+        badgeStatus.className = "px-3 py-1.5 rounded-lg border border-amber-500/50 bg-amber-950/50 text-amber-300 flex items-center gap-1.5 font-bold";
+        badgeStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> ADAPTING RE-CENTERING`;
+      } else {
+        badgeStatus.className = "px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 flex items-center gap-1.5 font-bold";
+        badgeStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> ACTIVE STABLE`;
+      }
+    }
+
+    // Chart.js Setup: Primary Phase-Space Scatter & Secondary Time-Series
+    let phaseChart, accelChart, fluxChart;
+
+    function initCharts() {
+      // 1. Phase-Space Plot: Flux (Phi) vs Accel (a)
+      // Theoretical nominal baseline corridor
+      const nominalLine = [];
+      for (let a = 0; a <= 0.35; a += 0.02) {
+        nominalLine.push({ x: a, y: 0.005 + 0.15 * a });
+      }
+
+      // Hazard threshold line at a = 0.10 micro-g
+      const hazardLine = [
+        { x: 0.10, y: 0.0 },
+        { x: 0.10, y: 0.08 }
+      ];
+
+      const ctxPhase = document.getElementById('phaseSpaceChart').getContext('2d');
+      phaseChart = new Chart(ctxPhase, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Live Dynamic Trajectory',
+              data: [{ x: 0.082, y: 0.014 }],
+              borderColor: '#06b6d4',
+              backgroundColor: '#06b6d4',
+              showLine: true,
+              borderWidth: 2,
+              tension: 0.2,
+              pointRadius: (ctx) => {
+                const index = ctx.dataIndex;
+                const total = ctx.dataset.data.length;
+                return index === total - 1 ? 7 : 3;
+              },
+              pointHoverRadius: 8,
+              pointBackgroundColor: (ctx) => {
+                const index = ctx.dataIndex;
+                const total = ctx.dataset.data.length;
+                return index === total - 1 ? '#ffffff' : 'rgba(6, 182, 212, 0.4)';
+              }
+            },
+            {
+              label: 'Nominal Baseline Corridor',
+              data: nominalLine,
+              showLine: true,
+              borderColor: 'rgba(16, 185, 129, 0.8)',
+              borderWidth: 1.5,
+              borderDash: [4, 4],
+              pointRadius: 0
+            },
+            {
+              label: 'Jitter Hazard Boundary (0.10 \u03BCg)',
+              data: hazardLine,
+              showLine: true,
+              borderColor: 'rgba(239, 68, 68, 0.9)',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: {
+              type: 'linear',
+              position: 'bottom',
+              min: 0,
+              max: 0.30,
+              title: {
+                display: true,
+                text: 'Chassis Micro-Acceleration a (\u03BCg)',
+                color: '#94a3b8',
+                font: { family: 'JetBrains Mono', size: 10 }
+              },
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 9 } }
+            },
+            y: {
+              min: 0,
+              max: 0.07,
+              title: {
+                display: true,
+                text: 'Bearing Flux Ripple \u03A6 (mWb)',
+                color: '#94a3b8',
+                font: { family: 'JetBrains Mono', size: 10 }
+              },
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 9 } }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `a: ${ctx.parsed.x.toFixed(3)} \u03BCg, \u03A6: ${ctx.parsed.y.toFixed(3)} mWb`
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Accel Time-Series
+      const ctxAccel = document.getElementById('timeSeriesAccelChart').getContext('2d');
+      accelChart = new Chart(ctxAccel, {
+        type: 'line',
+        data: {
+          labels: timeSeriesLabels,
+          datasets: [{
+            data: accelDataBuffer,
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+            fill: true,
+            tension: 0.3,
+            borderWidth: 1.8,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: {
+              min: 0,
+              max: 0.28,
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 3. Flux Time-Series
+      const ctxFlux = document.getElementById('timeSeriesFluxChart').getContext('2d');
+      fluxChart = new Chart(ctxFlux, {
+        type: 'line',
+        data: {
+          labels: timeSeriesLabels,
+          datasets: [{
+            data: fluxDataBuffer,
+            borderColor: '#8b5cf6',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            fill: true,
+            tension: 0.3,
+            borderWidth: 1.8,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: {
+              min: 0,
+              max: 0.06,
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // Physical Simulation Step
+    let tickCount = 0;
+
+    function stepPhysics() {
+      tickCount++;
+
+      // Rotor angular speed in rad/s
+      const omega = (wheelRPM * 2 * Math.PI) / 60;
+      shaftTheta += (omega * 0.04) % (2 * Math.PI);
+
+      // Evaluate active eccentricity
+      let currentEccentricity = baseEccentricityMicrons;
+      if (faultSpikeActive) {
+        currentEccentricity += 3.8;
+        faultTimer--;
+        if (faultTimer <= 0) {
+          faultSpikeActive = false;
+        }
+      }
+
+      // Mathematical Physics Calculations:
+      // Rotational Centrifugal harmonic runout
+      const unbalanceForce = 0.008 * (wheelRPM / 6000) * (wheelRPM / 6000) * currentEccentricity;
+      dynamicForce = unbalanceForce;
+
+      if (cancellationEnabled) {
+        // Sentinel Active Inverse Current Cancellation
+        // The bearing dynamically commands coil currents to shift the magnetic center of levitation
+        // to coincide with the inertial mass center, nullifying transmitted force to chassis.
+        liveChassisAccel_ug = 0.050 + 0.025 * Math.sin(shaftTheta * 2) + (currentEccentricity * 0.008);
+        liveFluxRipple_mWb = 0.012 + (currentEccentricity * 0.005) + 0.004 * Math.sin(shaftTheta);
+        dynamicCurrent = 2.40 + 0.25 * (currentEccentricity / 2.0);
+
+        // Shaft orbit follows mass center
+        liveShaftX = (currentEccentricity * 0.04) * Math.cos(shaftTheta);
+        liveShaftY = (currentEccentricity * 0.04) * Math.sin(shaftTheta);
+      } else {
+        // Without adaptive cancellation: Unbalance forces transmit directly into the chassis
+        liveChassisAccel_ug = 0.050 + (unbalanceForce * 2.8) + (0.04 * Math.sin(shaftTheta * 3));
+        liveFluxRipple_mWb = 0.010 + (currentEccentricity * 0.012) + 0.008 * Math.cos(shaftTheta * 2);
+        dynamicCurrent = 2.40 + 0.95 * (currentEccentricity / 2.0);
+
+        // Physical eccentric runout whips around stator mechanical axis
+        liveShaftX = (currentEccentricity * 0.22) * Math.cos(shaftTheta);
+        liveShaftY = (currentEccentricity * 0.22) * Math.sin(shaftTheta);
+      }
+
+      // Update Phase-Space Trajectory History (last 16 state points)
+      phaseTrajectoryBuffer.push({ x: liveChassisAccel_ug, y: liveFluxRipple_mWb });
+      if (phaseTrajectoryBuffer.length > 18) {
+        phaseTrajectoryBuffer.shift();
+      }
+
+      // Update Telemetry Buffers every 2 ticks
+      if (tickCount % 2 === 0) {
+        accelDataBuffer.shift();
+        accelDataBuffer.push(liveChassisAccel_ug);
+
+        fluxDataBuffer.shift();
+        fluxDataBuffer.push(liveFluxRipple_mWb);
+
+        if (accelChart && fluxChart && phaseChart) {
+          accelChart.update('none');
+          fluxChart.update('none');
+
+          phaseChart.data.datasets[0].data = [...phaseTrajectoryBuffer];
+          phaseChart.update('none');
+        }
+
+        // Update DOM labels
+        document.getElementById('lblLiveAccel').textContent = `${liveChassisAccel_ug.toFixed(3)} \u03BCg`;
+        document.getElementById('lblLiveFlux').textContent = `${liveFluxRipple_mWb.toFixed(3)} mWb`;
+        document.getElementById('statCurrent').textContent = `${dynamicCurrent.toFixed(2)} A`;
+        document.getElementById('statForce').textContent = `${dynamicForce.toFixed(3)} N`;
+        document.getElementById('statJitter').textContent = `${liveChassisAccel_ug.toFixed(3)} \u03BCg RMS`;
+        document.getElementById('canvasTelemetryText').textContent = `Shaft Orbit: \u00B1${(Math.hypot(liveShaftX, liveShaftY)).toFixed(3)} \u03BCm`;
+        document.getElementById('shaftDisplacementX').innerHTML = `$\\delta_x$: ${liveShaftX >= 0 ? '+' : ''}${liveShaftX.toFixed(3)} \\mu\\text{m}`;
+        document.getElementById('shaftDisplacementY').innerHTML = `$\\delta_y$: ${liveShaftY >= 0 ? '+' : ''}${liveShaftY.toFixed(3)} \\mu\\text{m}`;
+        document.getElementById('fluxPerturbHUD').innerHTML = `$\\Delta\\Phi$: ${liveFluxRipple_mWb.toFixed(3)} \\text{mWb}`;
+
+        updateGlobalStatusBadges();
+      }
+
+      // Draw the physical AMB Stator & Rotor on Canvas
+      drawAMBCanvas();
+    }
+
+    // Canvas Visualization: AMB Heteropolar Stator, Dynamic Gap & Magnetic Flux Vectors
+    function drawAMBCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 500;
+      const h = rect.height || 320;
+      const cx = w / 2;
+      const cy = h / 2;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Deep space grid
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+      ctx.lineWidth = 1;
+      const gridSize = 24;
+      for (let x = 0; x < w; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Outer Stator Housing
+      const statorRadius = Math.min(w, h) * 0.44;
+      const boreRadius = statorRadius * 0.72;
+      const rotorRadius = boreRadius * 0.82;
+
+      // Draw Stator Ring
+      ctx.beginPath();
+      ctx.arc(cx, cy, statorRadius, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 12;
+      ctx.stroke();
+
+      // Draw 8 Stator Magnetic Poles
+      const poleCount = 8;
+      for (let i = 0; i < poleCount; i++) {
+        const angle = (i * 2 * Math.PI) / poleCount;
+        const poleOuterX = cx + Math.cos(angle) * statorRadius;
+        const poleOuterY = cy + Math.sin(angle) * statorRadius;
+        const poleTipX = cx + Math.cos(angle) * boreRadius;
+        const poleTipY = cy + Math.sin(angle) * boreRadius;
+
+        // Coil Body
+        ctx.save();
+        ctx.translate((poleOuterX + poleTipX) / 2, (poleOuterY + poleTipY) / 2);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.fillStyle = (i % 2 === 0) ? 'rgba(6, 182, 212, 0.25)' : 'rgba(139, 92, 246, 0.25)';
+        ctx.strokeStyle = (i % 2 === 0) ? '#06b6d4' : '#8b5cf6';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(-12, -8, 24, 16);
+        ctx.strokeRect(-12, -8, 24, 16);
+        ctx.restore();
+
+        // Pole Shoe Tip
+        ctx.beginPath();
+        ctx.arc(poleTipX, poleTipY, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = '#475569';
+        ctx.fill();
+      }
+
+      // Dynamic Shaft Center Offset (amplified by 450 for clear visual telemetry)
+      const visualScale = 450;
+      const shaftCenterX = cx + liveShaftX * visualScale;
+      const shaftCenterY = cy + liveShaftY * visualScale;
+
+      // Draw Magnetic Flux Field Lines in Airgap
+      const fluxIntensity = Math.min(1.0, liveFluxRipple_mWb * 18);
+      for (let i = 0; i < poleCount; i++) {
+        const angle = (i * 2 * Math.PI) / poleCount;
+        const poleTipX = cx + Math.cos(angle) * boreRadius;
+        const poleTipY = cy + Math.sin(angle) * boreRadius;
+        const rotorSurfaceX = shaftCenterX + Math.cos(angle) * rotorRadius;
+        const rotorSurfaceY = shaftCenterY + Math.sin(angle) * rotorRadius;
+
+        ctx.beginPath();
+        ctx.moveTo(poleTipX, poleTipY);
+        ctx.lineTo(rotorSurfaceX, rotorSurfaceY);
+        ctx.strokeStyle = (cancellationEnabled) 
+          ? `rgba(6, 182, 212, ${0.25 + 0.5 * fluxIntensity})` 
+          : `rgba(239, 68, 68, ${0.3 + 0.6 * fluxIntensity})`;
+        ctx.lineWidth = 1.5 + fluxIntensity * 2.5;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Nominal Center Reticle
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = '#64748b';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(cx - 15, cy); ctx.lineTo(cx + 15, cy);
+      ctx.moveTo(cx, cy - 15); ctx.lineTo(cx, cy + 15);
+      ctx.stroke();
+
+      // Rotating Rotor Body
+      ctx.save();
+      ctx.translate(shaftCenterX, shaftCenterY);
+      ctx.rotate(shaftTheta);
+
+      // Ferromagnetic Rotor Core
+      const rotorGrad = ctx.createRadialGradient(0, 0, rotorRadius * 0.2, 0, 0, rotorRadius);
+      rotorGrad.addColorStop(0, '#1e293b');
+      rotorGrad.addColorStop(0.7, '#0f172a');
+      rotorGrad.addColorStop(1, '#334155');
+
+      ctx.beginPath();
+      ctx.arc(0, 0, rotorRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = rotorGrad;
+      ctx.fill();
+      ctx.strokeStyle = cancellationEnabled ? '#06b6d4' : '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Rotor keyways & mass imbalance marker
+      ctx.beginPath();
+      ctx.arc(rotorRadius * 0.65, 0, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#f59e0b'; // Imbalance spot
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Rotor spokes
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      for (let s = 0; s < 4; s++) {
+        ctx.beginPath();
+        ctx.moveTo(-rotorRadius * 0.85, 0);
+        ctx.lineTo(rotorRadius * 0.85, 0);
+        ctx.rotate(Math.PI / 4);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      // Dynamic Shaft Center Marker
+      ctx.beginPath();
+      ctx.arc(shaftCenterX, shaftCenterY, 2.5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#06b6d4';
+      ctx.fill();
+
+      // Orbit Trace (Halo)
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.hypot(liveShaftX, liveShaftY) * visualScale, 0, 2 * Math.PI);
+      ctx.strokeStyle = cancellationEnabled ? 'rgba(6, 182, 212, 0.4)' : 'rgba(239, 68, 68, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Lifecycle Initialization
+    window.onload = function() {
+      lucide.createIcons();
+      resizeCanvas();
+      initCharts();
+      setInterval(stepPhysics, 40);
+    };
+  </script>
+</body>
+</html>
